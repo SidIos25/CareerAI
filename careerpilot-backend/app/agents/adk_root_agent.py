@@ -135,41 +135,31 @@ roadmap_agent = LlmAgent(
 confidence_agent = LlmAgent(
     name="ConfidenceExplainer",
     model=_adk_openai_model(),
-    description="Produces confidence scoring and explainability for the generated plan.",
+    description="Produces confidence scoring and final user-facing markdown report.",
     instruction=with_guardrails(
-        task_instruction="Score confidence and provide explainability for this career plan.",
-        output_contract=(
-            "Return JSON object with keys: score (float 0..1), rationale (string), "
-            "assumptions (string[]), explainability (object)."
+        task_instruction=(
+            "Using prior outputs from this run, produce the final user-facing markdown report for ADK Web UI. "
+            "Do not invent data; if a section lacks evidence, say 'Not enough information'. "
+            "Use exactly these sections in order: "
+            "1) Career Fit Snapshot, 2) Matched Skills, 3) Missing Skills (Top Gaps), "
+            "4) Priority Actions, 5) Weekly Roadmap, 6) Confidence. "
+            "In the Confidence section, include score (0..1), short rationale, and key assumptions. "
+            "Use short bullets and keep it concise."
         ),
-    ),
-    output_key="confidence_json",
-)
-
-result_formatter_agent = LlmAgent(
-    name="ResultFormatter",
-    model=_adk_openai_model(),
-    description="Formats the final pipeline output into a readable markdown report for ADK Web UI.",
-    instruction=(
-        "You are a response formatter for ADK Web UI. "
-        "Using prior agent outputs from this run, generate a clean markdown report for the user. "
-        "Do not invent data; if a section has insufficient evidence, say 'Not enough information'. "
-        "Use exactly these sections in order: "
-        "1) Career Fit Snapshot, 2) Matched Skills, 3) Missing Skills (Top Gaps), "
-        "4) Priority Actions, 5) Weekly Roadmap, 6) Confidence. "
-        "Use short bullets, keep it concise, and avoid raw JSON in the final answer."
+        output_contract=(
+            "Return markdown only."
+        ),
     ),
 )
 
 root_agent = SequentialAgent(
     name="CareerPilotPipeline",
-    description="Parallel analysis followed by gap analysis, prioritization, roadmap, confidence scoring, and final UI formatting.",
+    description="Parallel analysis followed by gap analysis, prioritization, roadmap, and final confidence+report output.",
     sub_agents=[
         parallel_analysis_agent,
         gap_agent,
         prioritizer_agent,
         roadmap_agent,
         confidence_agent,
-        result_formatter_agent,
     ],
 )
