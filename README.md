@@ -1,72 +1,167 @@
+
 # CareerAI
 
-CareerAI is a multi-agent career analysis app built with Google ADK + FastAPI.
-It compares a resume with a job description, finds gaps, prioritizes actions, and generates a roadmap.
+CareerAI is a multi-agent career analysis application built with Google ADK and FastAPI.  
+It compares a resume with a job description, identifies and prioritizes gaps, and generates a practical learning roadmap.
 
-## Workspace Structure
+---
 
-- `adk_apps/careerpilot_ai/` - ADK app entrypoint (`agent.py`)
-- `careerpilot-backend/` - backend models, agents, and API
-- `start_adk_web.ps1` - helper script to launch ADK Web
+## Key features
 
-## Quick Start
+- Parallel resume & job analysis
+- Gap detection and prioritized skill recommendations
+- Weekly learning roadmaps
+- Confidence-scored final report
+- ADK + FastAPI architecture for interactive UI and API
 
-### 1) Activate virtual environment (workspace root)
+---
 
+## Repository layout
+
+- `adk_apps/careerpilot_ai/` — ADK app entrypoint (package: `agent.py`)  
+- `careerpilot-backend/` — backend service (FastAPI, agents, models, runner)  
+- `start_adk_web.ps1` — reliable ADK Web launcher (PowerShell)  
+- `.venv/` — recommended local virtual environment (not checked in)  
+- `README.md` — this file
+
+---
+
+## Quick start (recommended)
+
+1. Open a terminal at the workspace root.
+
+2. Activate venv
+- PowerShell:
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
-
-### 2) Run ADK Web (simple)
-
-Open terminal in `adk_apps` and run:
-
-```powershell
-adk web
+- Git Bash:
+```bash
+source .venv/Scripts/activate
 ```
 
-Then open: `http://localhost:8000`
+3. Start ADK Web (run from `adk_apps` so only the intended ADK app is discovered):
+```powershell
+cd adk_apps
+adk web
+# then open http://localhost:8000
+```
+Or use helper:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_adk_web.ps1
+```
 
-### 3) Run backend API (optional)
-
+4. (Optional) Run backend API locally:
 ```powershell
 Set-Location .\careerpilot-backend
 python run.py
 ```
 
-## Agent Workflow
+---
+
+## Backend (CareerPilot Backend)
+
+Backend overview:
+- `careerpilot-backend/app/main.py` — FastAPI app & endpoints  
+- `careerpilot-backend/app/models.py` — request/response schemas  
+- `careerpilot-backend/app/agents/` — agents implementing analysis & strategy  
+- `careerpilot-backend/app/services/workflow_runner.py` — orchestration layer  
+- `careerpilot-backend/run.py` — local entrypoint
+
+Install backend deps:
+```bash
+cd careerpilot-backend
+pip install -r requirements.txt
+```
+
+Environment (example `.env`):
+```env
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_SECONDS=45
+OPENAI_MAX_RETRIES=1
+OPENAI_TOP_P=0.1
+```
+
+API endpoints:
+- `GET /api/health`  
+- `POST /api/analyze` — body: `{ "resume_text": "...", "job_description_text": "..." }`
+
+ADK integration: `adk_apps/careerpilot_ai/agent.py` imports `root_agent` from `careerpilot-backend/app/agents/adk_root_agent.py`.
+
+---
+
+## Agent workflow (top → down)
 
 ```mermaid
 flowchart TD
-    ParallelAnalysis[ParallelAnalysis]
-    ResumeAnalyzer[ResumeAnalyzer]
-    JobAnalyzer[JobAnalyzer]
-    GapAnalyzer[GapAnalyzer]
-    GapPrioritizer[GapPrioritizer]
-    RoadmapBuilder[RoadmapBuilder]
-    ConfidenceExplainer[ConfidenceExplainer]
-    FinalReport[Final Report to User]
-
-    ParallelAnalysis --> ResumeAnalyzer
-    ParallelAnalysis --> JobAnalyzer
-    ResumeAnalyzer --> GapAnalyzer
-    JobAnalyzer --> GapAnalyzer
-    GapAnalyzer --> GapPrioritizer
-    GapPrioritizer --> RoadmapBuilder
-    RoadmapBuilder --> ConfidenceExplainer
-    ConfidenceExplainer --> FinalReport
+  ParallelAnalysis --> ResumeAnalyzer
+  ParallelAnalysis --> JobAnalyzer
+  ResumeAnalyzer --> GapAnalyzer
+  JobAnalyzer --> GapAnalyzer
+  GapAnalyzer --> GapPrioritizer
+  GapPrioritizer --> RoadmapBuilder
+  RoadmapBuilder --> ConfidenceExplainer
+  ConfidenceExplainer --> FinalReport[Final Report to User]
 ```
 
-## Output Sequence
+Short flow: Resume + Job → ParallelAnalysis (ResumeAnalyzer & JobAnalyzer) → GapAnalyzer → GapPrioritizer → RoadmapBuilder → ConfidenceExplainer → Final Report.
 
-1. Resume + job are analyzed in parallel.
-2. Skill and experience gaps are identified.
-3. Missing skills are prioritized.
-4. Weekly roadmap is generated.
-5. Final user-facing report is returned.
+---
+
+## Troubleshooting (common issues)
+
+- "module 'X' has no attribute 'agent'": run `adk web` from `adk_apps` or ensure `__init__.py` exposes `agent` (e.g., `from . import agent`).  
+- Duplicate apps in ADK UI: ensure CWD is `adk_apps` when running `adk web` or remove shim modules.  
+- Stale graph after code changes: stop ADK, run `adk web --reload_agents`, hard-refresh the browser (Ctrl+F5), and start a new session.  
+- `adk` resolves to wrong exe: activate the workspace venv before running or use `start_adk_web.ps1`.
+
+---
+
+## Development & tests
+
+- Run tests:
+```bash
+cd careerpilot-backend
+pytest
+```
+- Lint/format:
+```bash
+black careerpilot-backend
+flake8 careerpilot-backend
+```
+
+---
+
+## Git workflow (safe push)
+
+1. Review:
+```bash
+git status
+git diff -- README.md
+```
+2. Stage intended files only:
+```bash
+git add README.md adk_apps/careerpilot_ai/__init__.py careerpilot-backend/app/agents/adk_root_agent.py
+```
+3. Commit & push:
+```bash
+git commit -m "docs: unified README with simplified agent workflow"
+git pull --rebase origin main
+git push origin main
+```
+
+If duplicate commits exist, run interactive rebase before pushing:
+```bash
+git fetch origin
+git rebase -i origin/main
+git push origin main --force-with-lease
+```
+
+---
 
 ## Notes
 
-- For ADK app usage, run from `adk_apps` so only `careerpilot_ai` is discovered.
-- If UI looks stale after code changes, restart ADK and create a new session.
-- Detailed backend docs are in `careerpilot-backend/README.md`.
+- Prefer running ADK from `adk_apps` to control app discovery.
+- Keep pipeline concise: collapse unused formatter agents into the final explainer when safe.
+- After code changes, create a fresh ADK session to view updated traces.
